@@ -1,0 +1,22 @@
+# Virtual Environment
+venv/
+.env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# RAG / Vector DB storage
+chroma_db/
+storage/
+faiss_index/
+
+# Uploaded documents
+uploads/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
