@@ -1,18 +1,18 @@
-# Virtual Environment
+# Python
+__pycache__/
+*.pyc
+*.db
+
+# Environment
+.env
 venv/
 .env/
 
-# Python cache
-__pycache__/
-*.pyc
-
-# RAG / Vector DB storage
-chroma_db/
-storage/
-faiss_index/
-
-# Uploaded documents
-uploads/
+# Node / Next.js
+node_modules/
+frontend-next/node_modules/
+frontend-next/.next/
+frontend-next/out/
 
 # Logs
 *.log

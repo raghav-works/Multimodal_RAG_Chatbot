@@ -6,6 +6,7 @@ Simple local multimodal chatbot that supports:
 
 ## Requirements
 - Python 3.10
+- Node.js 18+ (for Next.js frontend)
 - Ollama installed and running
 
 ## Setup
@@ -27,6 +28,16 @@ In another terminal:
 - `streamlit run frontend/app.py`
 
 The UI will be available at `http://localhost:8501`.
+
+## Run the Next.js frontend
+In another terminal:
+1. `cd frontend-next`
+2. `npm install`
+3. `npm run dev`
+
+The UI will be available at `http://localhost:3000`.
+Optional: create `frontend-next/.env.local` and set:
+`NEXT_PUBLIC_API_URL=http://localhost:8000`
 
 ## Usage
 1. Sign up or log in on the Streamlit pages.

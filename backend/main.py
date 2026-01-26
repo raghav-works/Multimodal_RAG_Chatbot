@@ -2,7 +2,9 @@ import os
 
 os.environ["CHROMA_TELEMETRY"] = "False"
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from typing import Optional
+
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -39,6 +41,11 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class QueryRequest(BaseModel):
+    document_id: Optional[str] = None
+    question: str
+
+
 def _get_extension(filename: str) -> str:
     return os.path.splitext(filename)[1].lower().strip(".")
 
@@ -68,7 +75,7 @@ def signup(payload: SignupRequest):
     password_hash = hash_password(payload.password)
     user = create_user(payload.username, payload.email, password_hash)
     token = create_access_token(user["id"], user["username"])
-    return {"token": token, "user": user}
+    return {"access_token": token, "user": user}
 
 
 @app.post("/login")
@@ -77,12 +84,15 @@ def login(payload: LoginRequest):
     if not user or not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials.")
     token = create_access_token(user["id"], user["username"])
-    return {"token": token, "user": {"id": user["id"], "username": user["username"], "email": user["email"]}}
+    return {
+        "access_token": token,
+        "user": {"id": user["id"], "username": user["username"], "email": user["email"]},
+    }
 
 
 @app.get("/me")
 def me(current_user: dict = Depends(get_current_user)):
-    return current_user
+    return {"username": current_user["username"]}
 
 
 @app.post("/upload")
@@ -112,25 +122,17 @@ async def upload_document(
 
 @app.post("/query")
 async def query(
-    question: str = Form(...),
-    document_id: str = Form(None),
-    file: UploadFile = File(None),
+    payload: QueryRequest = Body(...),
     current_user: dict = Depends(get_current_user),
 ):
-    if not question or not question.strip():
+    if not payload.question or not payload.question.strip():
         raise HTTPException(status_code=400, detail="Question is required.")
+    if not payload.document_id:
+        raise HTTPException(status_code=400, detail="document_id is required.")
 
-    filename = file.filename if file else ""
     try:
-        if file and _is_image_file(filename):
-            file_bytes = await file.read()
-            if not file_bytes:
-                raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-            answer = answer_image_question(file_bytes, question)
-            return {"type": "image", "answer": answer}
-        if document_id:
-            answer = answer_question_with_document_id(document_id, question)
-            return {"type": "document", "answer": answer}
+        answer = answer_question_with_document_id(payload.document_id, payload.question)
+        return {"answer": answer}
     except DocumentLoadError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -138,7 +140,28 @@ async def query(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Server error: {exc}") from exc
 
-    raise HTTPException(
-        status_code=400,
-        detail="Provide an image file or a document_id for document queries.",
-    )
+
+@app.post("/image_query")
+async def image_query(
+    question: str = Form(...),
+    image: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    if not image or not image.filename:
+        raise HTTPException(status_code=400, detail="Image file is required.")
+    if not _is_image_file(image.filename):
+        raise HTTPException(status_code=400, detail="Only PNG and JPG images are supported.")
+    if not question or not question.strip():
+        raise HTTPException(status_code=400, detail="Question is required.")
+
+    file_bytes = await image.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    try:
+        answer = answer_image_question(file_bytes, question)
+        return {"answer": answer}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Server error: {exc}") from exc
